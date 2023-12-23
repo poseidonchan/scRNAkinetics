@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
     name = 'scKinetics',
-    version = '0.2.2',
+    version = '0.2.3',
     description = 'Biological prior guided single-cell kinetics inference.',
     author = 'Yanshuo Chen',
     author_email = 'poseidonchan@icloud.com',
@@ -9,7 +9,7 @@ setup(
     license = 'GPL-3.0 license',
     packages = find_packages(),
     python_requires='>=3.9',
-    platforms = 'any',
+    platforms = 'Linux',
     install_requires = [
         'diffrax',
         'jax >= 0.4.13',
@@ -20,5 +20,8 @@ setup(
         'matplotlib',
         'seaborn',
         'numpy',
+        'cellrank>=2.0.0',
+        'torch',
+        'torchdiffeq'
     ],
 )

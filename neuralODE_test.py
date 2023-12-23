@@ -106,7 +106,7 @@ def fit_neural_ode(u, s, t, num_epochs=300, device='cpu'):
     velo_model = RNAvelo(feature_size=feature_size).to(device)
 
     # Define an optimizer
-    optimizer = torch.optim.Adam(velo_model.parameters(), lr=5e-2)
+    optimizer = torch.optim.Adam(velo_model.parameters(), lr=1e-2)
 
     # Training loop
     for epoch in range(num_epochs):
