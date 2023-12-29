@@ -15,8 +15,9 @@ import torch.nn.functional as F
 from torchdiffeq import odeint
 
 import warnings
+
 warnings.filterwarnings('ignore')
-# warnings.filterwarnings("ignore", message="An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.")
+
 
 class RNAvelo_jax(eqx.Module):
     log_alpha: jnp.array
@@ -34,9 +35,9 @@ class RNAvelo_jax(eqx.Module):
         """
         super().__init__(**kwargs)
         self.feature_size = feature_size
-        self.log_alpha = jax.random.normal(key, (feature_size,))
-        self.log_beta = jax.random.normal(key, (feature_size,))
-        self.log_gamma = jax.random.normal(key, (feature_size,))
+        self.log_alpha = jnp.ones(feature_size)
+        self.log_beta = jnp.ones(feature_size)
+        self.log_gamma = jnp.ones(feature_size)
 
     def __call__(self, t, x, args):
         if len(x.shape) == 1:
@@ -56,7 +57,7 @@ class RNAvelo_jax(eqx.Module):
 
 class NeuralODE(eqx.Module):
     func: RNAvelo_jax
-    
+
     def __init__(self, feature_size, *, key, **kwargs):
         """
         Define neuralODE modual for clean forward pass
@@ -81,7 +82,7 @@ class NeuralODE(eqx.Module):
             t1=ts[-1],
             dt0=ts[1] - ts[0],
             y0=y0,
-            max_steps=16**4,
+            max_steps=16 ** 4,
             throw=False,
         )
 
@@ -114,13 +115,17 @@ def fit_neural_ode_jax(u, s, t, gene_i=None, num_iter=300):
         return total_loss
 
     def compute_feature_loss(y, y_pred, gene_i, feature_size):
-        return jnp.mean(jnp.abs(y[:, gene_i] - y_pred[:, gene_i]) + jnp.abs(y[:, gene_i + feature_size] - y_pred[:, gene_i + feature_size]))
+        return jnp.mean(jnp.abs(y[:, gene_i] - y_pred[:, gene_i]) + jnp.abs(
+            y[:, gene_i + feature_size] - y_pred[:, gene_i + feature_size]))
 
     @eqx.filter_jit
     def make_step(ti, yi, model, opt_state, gene_i=None, feature_size=None):
         total_loss, grads = grad_total_loss(model, ti, yi)
         y_pred = model(ti, yi[0])  # You might need to adjust this line based on your model's specifics
-        feature_loss = compute_feature_loss(yi, y_pred, gene_i, feature_size)
+        if gene_i is None:
+            feature_loss = None
+        else:
+            feature_loss = compute_feature_loss(yi, y_pred, gene_i, feature_size)
         updates, opt_state = optim.update(grads, opt_state)
         model = eqx.apply_updates(model, updates)
         return total_loss, feature_loss, model, opt_state
@@ -128,9 +133,9 @@ def fit_neural_ode_jax(u, s, t, gene_i=None, num_iter=300):
     optim = optax.adam(learning_rate=5e-2)
     opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
 
-    
     for iter in range(num_iter):
-        total_loss, feature_loss, model, opt_state = make_step(pseudo_time, expression_matrix, model, opt_state, gene_i, feature_size=feature_size)
+        total_loss, feature_loss, model, opt_state = make_step(pseudo_time, expression_matrix, model, opt_state, gene_i,
+                                                               feature_size=feature_size)
 
     # After training
     log_alpha, log_beta, log_gamma = model.func.log_alpha, model.func.log_beta, model.func.log_gamma
@@ -138,10 +143,15 @@ def fit_neural_ode_jax(u, s, t, gene_i=None, num_iter=300):
     alpha, beta, gamma = jnp.exp(log_alpha), jnp.exp(log_beta), jnp.exp(log_gamma)
     # clear the cache
     # jax.clear_caches()
-    return alpha, beta, gamma, feature_loss
+
+    if gene_i is None:
+        return alpha, beta, gamma
+    else:
+        return alpha, beta, gamma, feature_loss
+
 
 def process_group(adata, group_key, group_value,
-                  pt_key='palantir_pseudotime',  vkey=None,
+                  pt_key='palantir_pseudotime', vkey=None,
                   num_iter=100):
     """
     helper function for parallelization
@@ -161,7 +171,7 @@ def process_group(adata, group_key, group_value,
     n_samples = adata.shape[0]
 
     alpha, beta, gamma = fit_neural_ode_jax(adata.layers['Mu'], adata.layers['Ms'], adata.obs[pt_key].values,
-                                              num_iter=num_iter)
+                                            num_iter=num_iter)
 
     alpha = np.repeat(alpha.reshape(1, -1), n_samples, axis=0)
     beta = np.repeat(beta.reshape(1, -1), n_samples, axis=0)
@@ -171,7 +181,9 @@ def process_group(adata, group_key, group_value,
     adata.layers['gamma'] = gamma
     adata.layers[vkey['spliced_velocity']] = adata.layers['Mu'] * adata.layers['beta'] - adata.layers['Ms'] * \
                                              adata.layers['gamma']
+
     adata.layers[vkey['unspliced_velocity']] = adata.layers['alpha'] - adata.layers['Mu'] * adata.layers['beta']
+
     return adata
 
 
@@ -199,7 +211,8 @@ def coarse_grained_kinetics(adata, group_key, pt_key='palantir_pseudotime',
 
     # Run the processing in parallel
     adata_list = Parallel(n_jobs=n_jobs, prefer="processes", backend='loky')(
-        delayed(process_group)(adata, group_key, group_value, pt_key=pt_key, vkey=vkey, num_iter=num_iter) for group_value in
+        delayed(process_group)(adata, group_key, group_value, pt_key=pt_key, vkey=vkey, num_iter=num_iter) for
+        group_value in
         tqdm(group_values))
 
     # Concatenate the results
@@ -233,15 +246,18 @@ def process_cell(cell_idx, adata, pt_key, num_iter, adj, gene_i=None):
     t = t[sorted_indices]
 
     # Assuming fit_neural_ode is a function that you have defined elsewhere
-    alpha, beta, gamma, feature_loss = fit_neural_ode_jax(u, s, t, num_iter=num_iter, gene_i=gene_i)
-
-    return alpha, beta, gamma, feature_loss
+    if gene_i is None:
+        alpha, beta, gamma = fit_neural_ode_jax(u, s, t, num_iter=num_iter)
+        return alpha, beta, gamma
+    else:
+        alpha, beta, gamma, feature_loss = fit_neural_ode_jax(u, s, t, num_iter=num_iter, gene_i=gene_i)
+        return alpha, beta, gamma, feature_loss
 
 
 def high_resolution_kinetics(adata, pt_key='palantir_pseudotime',
-                             gene_list = None,
+                             gene_list=None,
                              vkey={'unspliced_velocity': "unspliced_velocity",
-                                  'spliced_velocity': "spliced_velocity"},
+                                   'spliced_velocity': "spliced_velocity"},
                              num_iter=100, n_jobs=-1, gene_monitor=None):
     """
     cell-level kinetics parameters inference. Assume each cell and its neighbors have the same kinetics parameters,
@@ -263,41 +279,44 @@ def high_resolution_kinetics(adata, pt_key='palantir_pseudotime',
         adata = adata
     else:
         # choose special genes
-        adata = adata[:,gene_list]
+        adata = adata[:, gene_list]
 
+    gene_i = None
     for i in range(adata.shape[1]):
         if adata.var.index[i] == gene_monitor:
             gene_i = i
-    
+
     # Initialize matrices
     alpha = np.zeros((adata.shape[0], adata.shape[1]))
     beta = np.zeros((adata.shape[0], adata.shape[1]))
     gamma = np.zeros((adata.shape[0], adata.shape[1]))
 
     results = Parallel(n_jobs=n_jobs, prefer="processes", backend='loky')(
-        delayed(process_cell)(cell_idx, adata, pt_key, num_iter, adj=adata_obsp['connectivities'], gene_i=gene_i) for cell_idx in tqdm(range(adata.shape[0])))
-    # results = []
-    # for cell_idx in tqdm(range(adata.shape[0])):
-    #     result = process_cell(cell_idx, adata, pt_key, num_iter, adj=adata_obsp['connectivities'], gene_i=gene_i)
-    #     results.append(result)
+        delayed(process_cell)(cell_idx, adata, pt_key, num_iter, adj=adata_obsp['connectivities'], gene_i=gene_i) for
+        cell_idx in tqdm(range(adata.shape[0])))
 
-    feature_losses = []
-    # Unpack results
-    for i, (alpha_i, beta_i, gamma_i, feature_loss_i) in enumerate(results):
-        alpha[i,] = alpha_i
-        beta[i,] = beta_i
-        gamma[i,] = gamma_i
-        feature_losses.append(feature_loss_i)
+    if gene_monitor is None:
+        for i, (alpha_i, beta_i, gamma_i, feature_loss_i) in enumerate(results):
+            alpha[i,] = alpha_i
+            beta[i,] = beta_i
+            gamma[i,] = gamma_i
+    else:
+        feature_losses = []
+        for i, (alpha_i, beta_i, gamma_i, feature_loss_i) in enumerate(results):
+            alpha[i,] = alpha_i
+            beta[i,] = beta_i
+            gamma[i,] = gamma_i
+            feature_losses.append(feature_loss_i)
 
     # Store results in adata
     adata.layers['alpha'] = alpha
     adata.layers['beta'] = beta
     adata.layers['gamma'] = gamma
-    
-    for loss in feature_losses:
-        print(loss)
-    
-    adata.obs[gene_monitor+' loss'] = feature_losses
+
+    # for loss in feature_losses:
+    #     print(loss)
+
+    # adata.obs[gene_monitor+' loss'] = feature_losses
 
     adata.layers[vkey['spliced_velocity']] = adata.layers['Mu'] * adata.layers['beta'] - adata.layers['Ms'] * \
                                              adata.layers['gamma']
@@ -311,13 +330,13 @@ def high_resolution_kinetics(adata, pt_key='palantir_pseudotime',
 def kinetics_inference(adata: anndata.AnnData = None,
                        pt_key: str = None,
                        mode: str = 'high-resolution',
-                       group_key = None,
-                       gene_list = None,
+                       group_key=None,
+                       gene_list=None,
                        vkey: dict = {'unspliced_velocity': "unspliced_velocity",
                                      'spliced_velocity': "spliced_velocity"},
                        n_jobs: int = 1,
                        num_iter: int = 200,
-                       gene_monitor = None,
+                       gene_monitor=None,
                        ) -> anndata.AnnData:
     """
     Infer the kinetics parameters of RNA velocity equations. It has two modes, "coarse-grained" or "high-resolution" mode,
@@ -345,9 +364,11 @@ def kinetics_inference(adata: anndata.AnnData = None,
         adata = high_resolution_kinetics(adata, pt_key=pt_key, gene_list=gene_list, vkey=vkey,
                                          num_iter=num_iter, n_jobs=n_jobs, gene_monitor=gene_monitor)
     else:
-        raise ValueError("please make sure the mode is correct selected, only 'coarse-grained' and 'high-resolution' are valid and supported")
+        raise ValueError(
+            "please make sure the mode is correct selected, only 'coarse-grained' and 'high-resolution' are valid and supported")
 
     return adata
+
 
 """
 class RNAvelo_jax(eqx.Module):
@@ -401,6 +422,7 @@ class RNAvelo_jax(eqx.Module):
             ds = jnp.exp(log_beta) * u - jnp.exp(log_gamma) * s
             return jnp.concatenate([du, ds], axis=1)
 """
+
 # def high_resolution_kinetics(adata, pt_key='palantir_pseudotime',
 #                              gene_list = None,
 #                              vkey={'unspliced_velocity': "unspliced_velocity",
