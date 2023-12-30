@@ -296,7 +296,7 @@ def high_resolution_kinetics(adata, pt_key='palantir_pseudotime',
         cell_idx in tqdm(range(adata.shape[0])))
 
     if gene_monitor is None:
-        for i, (alpha_i, beta_i, gamma_i, feature_loss_i) in enumerate(results):
+        for i, (alpha_i, beta_i, gamma_i) in enumerate(results):
             alpha[i,] = alpha_i
             beta[i,] = beta_i
             gamma[i,] = gamma_i
