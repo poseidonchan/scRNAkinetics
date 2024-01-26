@@ -9,13 +9,6 @@ from jax import random, grad, jit
 from joblib import Parallel, delayed
 from tqdm import tqdm
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchdiffeq import odeint
-
-from jaxopt import ProjectedGradient
-from jaxopt.projection import projection_non_negative
 
 import warnings
 
@@ -72,7 +65,7 @@ def fit_ode_scipy(u_data, s_data, t_data, initial_guess=[1, 1, 1]):
             return cost
 
         # Run the optimization for the current feature with bounds
-        result = minimize(cost_function, initial_guess, method='L-BFGS-B', bounds=parameter_bounds)
+        result = minimize(cost_function, initial_guess, method='Powell', bounds=parameter_bounds)
 
         # Extract the optimized parameters for the current feature
         alpha_est[i], beta_est[i], gamma_est[i] = result.x
@@ -154,7 +147,6 @@ def fit_ode_jax(u, s, t, num_iter=1000):
     :param solver: specific solver used in the initial value problem.
     :return: $\alpha$, $\beta$ and $\gamma$, each with shape as (1, m)
     """
-    # print('enter jax')
     u = jnp.array(u, dtype=jnp.float32)
     s = jnp.array(s, dtype=jnp.float32)
     expression_matrix = jnp.concatenate([u, s], axis=1)
@@ -173,7 +165,7 @@ def fit_ode_jax(u, s, t, num_iter=1000):
     @eqx.filter_jit
     def make_step(ti, yi, model, opt_state):
         total_loss, grads = grad_loss(model, ti, yi)
-        updates, opt_state = optim.update(grads, opt_state)
+        updates, opt_state = optim.update(grads, opt_state, model)
         model = eqx.apply_updates(model, updates)
         # Project the parameters to the feasible region [0, infinity)
         new_alpha = jnp.maximum(model.func.alpha, 0)
@@ -187,7 +179,7 @@ def fit_ode_jax(u, s, t, num_iter=1000):
 
         return total_loss, model, opt_state
 
-    optim = optax.adam(learning_rate=1e-2)
+    optim = optax.adam(learning_rate=1e-1)
     opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
 
     for iter in range(num_iter):
@@ -439,10 +431,8 @@ def process_raw(cell_idx, u=None, s=None, t=None, adj=None, num_iter=1000, optim
     t = t[sorted_indices]
 
     if optimizer == 'scipy':
-        # print('using scipy')
         alpha, beta, gamma = fit_ode_scipy(u, s, t)
     elif optimizer == 'jax':
-        # print('using jax')
         alpha, beta, gamma = fit_ode_jax(u, s, t)
 
     return alpha, beta, gamma
@@ -456,9 +446,6 @@ def high_resolution_raw(u, s, t, adj, num_iter=100, n_jobs=-1, optimizer='scipy'
 
     results = Parallel(n_jobs=n_jobs, prefer="processes", backend='loky')(
         delayed(process_raw)(cell_idx, u, s, t, adj, num_iter, optimizer) for cell_idx in tqdm(range(u.shape[0])))
-    # results = []
-    # for cell_idx in tqdm(range(u.shape[0])):
-    #     results.append(process_raw(cell_idx, u, s, t, adj, num_iter, optimizer=optimizer))
 
     for i, (alpha_i, beta_i, gamma_i) in enumerate(results):
         alpha[i,] = alpha_i

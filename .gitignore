@@ -4,3 +4,13 @@
 .idea/inspectionProfiles/Project_Default.xml
 .idea/vcs.xml
 .ipynb_checkpoints/Untitled-checkpoint.ipynb
+*.h5ad
+*.eps
+Experiments/preliminary_tests/gastrulation_test.ipynb
+Experiments/preliminary_tests/neuralODE_test.ipynb
+Experiments/preliminary_tests/ODEsolver_test.ipynb
+Experiments/preliminary_tests/PINN.ipynb
+*.pyc
+sckinetics/pl/.ipynb_checkpoints/plotting-checkpoint.py
+sckinetics/.ipynb_checkpoints/__init__-checkpoint.py
+sckinetics/.ipynb_checkpoints/ODEsolver-checkpoint.py
