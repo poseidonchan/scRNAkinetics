@@ -1,5 +1,5 @@
-# scKinectics: inferring single-cell RNA kinetics
-![scKinetics](https://img.shields.io/badge/scKinetics-v0.2.4-blue)![PyPI - Downloads](https://img.shields.io/pypi/dm/scKinetics)![GitHub](https://img.shields.io/github/license/poseidonchan/scKinetics)
+# scKinetics: inferring single-cell RNA kinetics
+![scKinetics](https://img.shields.io/badge/scKinetics-v0.2.4-blue)![PyPI - Downloads](https://img.shields.io/pypi/dm/scKinetics)![GitHub License](https://img.shields.io/github/license/poseidonchan/scKinetics)
 ![figure1](https://github.com/poseidonchan/scKinectics/blob/main/Figures/figure1.png)
 
 ### Installation
