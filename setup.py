@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 setup(
-    name = 'scKinetics',
+    name = 'RNAkinetics',
     version = '0.2.4',
     description = 'Biological prior guided single-cell kinetics inference.',
     author = 'Yanshuo Chen',

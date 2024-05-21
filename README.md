@@ -1,5 +1,5 @@
-# scKinetics: inferring single-cell RNA kinetics
-![scKinetics](https://img.shields.io/badge/scKinetics-v0.2.4-blue)![PyPI - Downloads](https://img.shields.io/pypi/dm/scKinetics)![GitHub License](https://img.shields.io/github/license/poseidonchan/scKinetics)
+# scRNAkinetics: inferring single-cell RNA kinetics
+![RNAinetics](https://img.shields.io/badge/RNAkinetics-v0.2.4-blue)![PyPI - Downloads](https://img.shields.io/pypi/dm/RNAkinetics)![GitHub License](https://img.shields.io/github/license/poseidonchan/scKinetics)
 ![figure1](https://github.com/poseidonchan/scKinectics/blob/main/Figures/figure1.png)
 
 ### Installation
@@ -9,7 +9,7 @@ This package requires the jax as framework, please make sure your operation syst
 ```bash
 conda create -n kinetics python=3.9
 conda activate kinetics
-pip install scKinetics
+pip install RNAkinetics
 ```
 
 ### Usage
@@ -26,7 +26,7 @@ AnnData object, updated cell- and gene-wise kinetics parameters (['alpha'], ['be
 
 ```python
 import scvelo as scv
-from sckinetics import kinetics_inference
+from rnakinetics import kinetics_inference
 
 # Read data
 adata = scv.read('your_file_path.h5ad')
