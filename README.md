@@ -43,3 +43,16 @@ adata = kinetics_inference(adata, mode='high-resolution', pt_key='pseudotime_in_
 Reproducible experiments can be found in the Experiments folder. 
 
 Archived data is available at Google Drive: https://drive.google.com/file/d/1NbVdMjWjvDbhJiaTH1_MDw73OqD_B8wK/view?usp=sharing.
+
+### Citation
+```latex
+@article{scRNAkinetics,
+	title = {Inferring Single-Cell RNA Kinetics from Various Biological Priors},
+	url = {https://www.biorxiv.org/content/10.1101/2024.05.21.595179v1},
+	doi = {10.1101/2024.05.21.595179},
+	journal = {bioRxiv},
+	author = {Chen, Yanshuo and Hu, Zhengmian and Ni, Ke and Feng, Site and Chen, Wei and Huang, Heng},
+	month = may,
+	year = {2024},
+}
+```
